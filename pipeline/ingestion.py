@@ -58,38 +58,35 @@ def process_data(
     data_dir: str, config: Dict[str, Any]
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
-    Load CIFAR-10 dataset from extracted directory.
+    Load CIFAR-10 dataset from extracted directory using configurable batches.
 
     Args:
     - data_dir (str): Path to extracted CIFAR-10 dataset directory.
-    - config (Dict[str, Any]): Configuration dictionary containing parameters for data splitting and paths.
+    - config (Dict[str, Any]): Contains 'n_batches', 'batch_indices', 'val_size', 'random_state'.
 
     Returns:
     - Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]: Training, validation, and testing DataFrames.
     """
-    batches = [
-        f"{data_dir}/cifar-10-batches-py/data_batch_{i}" for i in range(1, 6)]
+    n_batches = config.get("n_batches", 5)
+    batch_indices = config.get("batch_indices", list(range(1, n_batches + 1)))
+    batch_paths = [f"{data_dir}/cifar-10-batches-py/data_batch_{i}" for i in batch_indices]
+
     test_batch = f"{data_dir}/cifar-10-batches-py/test_batch"
 
     all_data, all_labels = [], []
 
-    # Load training data
-    for batch in batches:
+    for batch in batch_paths:
         batch_data = unpickle(batch)
         all_data.append(batch_data[b"data"])
         all_labels.extend(batch_data[b"labels"])
 
-    train_data = np.vstack(all_data).reshape(-1, 3, 32,
-                                             32).astype("float32") / 255.0
+    train_data = np.vstack(all_data).reshape(-1, 3, 32, 32).astype("float32") / 255.0
     train_labels = np.array(all_labels)
 
-    # Load test data
     test_data_dict = unpickle(test_batch)
-    test_data = test_data_dict[b"data"].reshape(
-        -1, 3, 32, 32).astype("float32") / 255.0
+    test_data = test_data_dict[b"data"].reshape(-1, 3, 32, 32).astype("float32") / 255.0
     test_labels = np.array(test_data_dict[b"labels"])
 
-    # Create DataFrames
     train_df = pd.DataFrame({"image": list(train_data), "label": train_labels})
     test_df = pd.DataFrame({"image": list(test_data), "label": test_labels})
 
@@ -98,7 +95,9 @@ def process_data(
         test_size=config.get("val_size", 0.2),
         random_state=config.get("random_state", 42),
     )
+
     logging.info(
-        f"Prepared 3 data splits: train, size: {len(train_df)}, val: {len(val_df)}, test: {len(val_df)}"
+        f"Prepared 3 data splits from batches {batch_indices}: "
+        f"train={len(train_df)}, val={len(val_df)}, test={len(test_df)}"
     )
     return train_df, val_df, test_df
